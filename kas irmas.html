@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Kas & QRIS Remaja Masjid Desa Mandala</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; }
+            .shadow-md, .shadow-xl, .shadow-sm, .shadow { box-shadow: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 pb-12">
+
+    <!-- Header Navbar -->
+    <header class="bg-emerald-800 text-white shadow-lg no-print sticky top-0 z-40">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-emerald-700 p-2.5 rounded-xl border border-emerald-500/30">
+                    <i class="fa-solid fa-mosque text-2xl text-emerald-200"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold tracking-wide">REMAJA MASJID DESA MANDALA</h1>
+                    <p class="text-xs text-emerald-200">Sistem Informasi Bendahara & QRIS Digital</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Tombol QRIS -->
+                <button onclick="toggleQrisModal()" class="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-qrcode text-sm"></i> QRIS Infaq / Kas
+                </button>
+                <button onclick="window.print()" class="bg-emerald-700 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 border border-emerald-600">
+                    <i class="fa-solid fa-print"></i> Cetak Laporan
+                </button>
+                <button onclick="exportToCSV()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-file-excel"></i> Export CSV
+                </button>
+                <button onclick="backupData()" class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5" title="Cadangkan Data">
+                    <i class="fa-solid fa-download"></i> Backup
+                </button>
+                <label class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer" title="Pulihkan Data">
+                    <i class="fa-solid fa-upload"></i> Restore
+                    <input type="file" id="restoreFile" accept=".json" onchange="restoreData(event)" class="hidden">
+                </label>
+            </div>
+        </div>
+    </header>
+
+    <!-- Header Khusus Cetak/Print -->
+    <div class="hidden print-only p-4 text-center border-b-2 border-black mb-6">
+        <h1 class="text-2xl font-bold uppercase">Laporan Keuangan Kas Remaja Masjid</h1>
+        <h2 class="text-lg">Desa Mandala</h2>
+        <p class="text-sm italic mt-1" id="printPeriode">Periode: Semua Transaksi</p>
+    </div>
+
+    <main class="max-w-6xl mx-auto px-4 mt-6 space-y-6">
+
+        <!-- Baris Ringkasan Saldo -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Total Pemasukan</p>
+                    <p id="totalMasuk" class="text-lg font-bold text-emerald-600 mt-0.5">Rp 0</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-arrow-down-left"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Total Pengeluaran</p>
+                    <p id="totalKeluar" class="text-lg font-bold text-rose-600 mt-0.5">Rp 0</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-arrow-up-right"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Sisa Saldo Kas</p>
+                    <p id="sisaSaldo" class="text-xl font-black text-blue-700 mt-0.5">Rp 0</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-semibold text-slate-500 uppercase">Total Transaksi</p>
+                    <p id="totalTransaksiCount" class="text-lg font-bold text-slate-700 mt-0.5">0 Data</p>
+                </div>
+                <div class="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-lg">
+                    <i class="fa-solid fa-receipt"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layout 2 Kolom: Form Input & Grafik -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 no-print">
+            
+            <!-- Form Input Transaksi -->
+            <div class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide border-b pb-2 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-pen-to-square text-emerald-600"></i> Input Transaksi Baru
+                </h2>
+                <form id="kasForm" class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Tanggal</label>
+                        <input type="date" id="tanggal" required class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Jenis Transaksi</label>
+                        <select id="jenis" onchange="updateKategoriOptions()" class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <option value="masuk">Pemasukan (+)</option>
+                            <option value="keluar">Pengeluaran (-)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Kategori</label>
+                        <select id="kategori" class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Jumlah Nominal (Rp)</label>
+                        <!-- Input teks dengan format ribuan otomatis -->
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-2 text-xs font-bold text-slate-400">Rp</span>
+                            <input type="text" id="jumlahDisplay" placeholder="50.000" oninput="formatInputRupiah(this)" required class="w-full p-2 pl-8 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold text-slate-800">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Keterangan Catatan</label>
+                        <textarea id="keterangan" rows="2" placeholder="Detail transaksi..." required class="w-full p-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+                    </div>
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg text-xs transition shadow flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-floppy-disk"></i> Simpan Transaksi
+                    </button>
+                </form>
+            </div>
+
+            <!-- Visualisasi Grafik -->
+            <div class="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col">
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide border-b pb-2 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-column text-emerald-600"></i> Statistik Keuangan Bulanan
+                </h2>
+                <div class="flex-1 min-h-[220px] flex items-center justify-center">
+                    <canvas id="kasChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Tabel & Filter Transaksi -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b pb-3 no-print">
+                <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-emerald-600"></i> Riwayat Transaksi
+                </h2>
+                
+                <!-- Filter & Search Bar -->
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <input type="text" id="searchInput" oninput="renderApp()" placeholder="Cari keterangan..." class="p-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none w-full sm:w-40">
+                    
+                    <select id="filterBulan" onchange="renderApp()" class="p-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                        <option value="all">Semua Bulan</option>
+                        <option value="01">Januari</option>
+                        <option value="02">Februari</option>
+                        <option value="03">Maret</option>
+                        <option value="04">April</option>
+                        <option value="05">Mei</option>
+                        <option value="06">Juni</option>
+                        <option value="07">Juli</option>
+                        <option value="08">Agustus</option>
+                        <option value="09">September</option>
+                        <option value="10">Oktober</option>
+                        <option value="11">November</option>
+                        <option value="12">Desember</option>
+                    </select>
+
+                    <select id="filterTahun" onchange="renderApp()" class="p-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white">
+                        <!-- Populated dynamically -->
+                    </select>
+                </div>
+            </div>
+
+            <!-- Tabel Data -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
+                            <th class="p-3">Tanggal</th>
+                            <th class="p-3">Kategori</th>
+                            <th class="p-3">Keterangan</th>
+                            <th class="p-3">Jenis</th>
+                            <th class="p-3 text-right">Nominal</th>
+                            <th class="p-3 text-center no-print">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tabelKas" class="divide-y divide-slate-100">
+                        <!-- Transaksi dimasukkan via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Tanda Tangan Cetak -->
+            <div class="hidden print-only mt-12 pt-6 grid grid-cols-2 text-center text-xs">
+                <div>
+                    <p>Mengetahui,</p>
+                    <p class="font-bold mt-1">Ketua Remaja Masjid</p>
+                    <br><br><br>
+                    <p class="underline font-bold">( .................................... )</p>
+                </div>
+                <div>
+                    <p>Desa Mandala, <span id="printTanggalSekarang"></span></p>
+                    <p class="font-bold mt-1">Bendahara Kas</p>
+                    <br><br><br>
+                    <p class="underline font-bold">( .................................... )</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- MODAL QRIS -->
+    <div id="qrisModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 no-print">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 text-center shadow-2xl relative space-y-4 border border-slate-100">
+            <button onclick="toggleQrisModal()" class="absolute top-3 right-3 text-slate-400 hover:text-slate-600 text-lg w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div>
+                <span class="bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full">QRIS Resmi Remaja Masjid</span>
+                <h3 class="text-base font-bold text-slate-800 mt-1">Infaq & Kas Digital</h3>
+                <p class="text-xs text-slate-500">Desa Mandala</p>
+            </div>
+
+            <!-- Display Gambar QRIS -->
+            <div class="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-3 flex flex-col items-center justify-center min-h-[220px]">
+                <img id="qrisImg" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=QRIS-REMAJA-MASJID-DESA-MANDALA" alt="QRIS Remaja Masjid Mandala" class="w-52 h-52 object-contain rounded-lg shadow-sm border border-slate-200">
+                <p class="text-[11px] text-slate-500 mt-2 flex items-center gap-1 font-medium">
+                    <i class="fa-solid fa-mobile-screen-button text-emerald-600"></i> Scan pakai GoPay, OVO, Dana, ShopeePay & M-Banking
+                </p>
+            </div>
+
+            <!-- Form Ubah Gambar QRIS oleh Bendahara -->
+            <div class="border-t pt-3 text-left space-y-2">
+                <button onclick="toggleQrisSettings()" class="text-xs text-emerald-700 hover:underline font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-gear"></i> Pengaturan Gambar QRIS Bendahara
+                </button>
+                <div id="qrisSettings" class="hidden space-y-2 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                    <label class="block text-[11px] font-medium text-slate-600">Upload File Gambar QRIS Masjid:</label>
+                    <input type="file" id="qrisUploadInput" accept="image/*" onchange="uploadQrisImage(event)" class="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100">
+                    <p class="text-[10px] text-slate-400">*Upload QRIS resmi yang didapat dari Bank/E-Wallet masjid.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const katPemasukan = ["Kas Anggota", "Infaq Jumat", "Infaq QRIS Digital", "Sponsorship/Donatur", "Acara/Kajian", "Lain-lain"];
+        const katPengeluaran = ["Konsumsi", "Peralatan/Perlengkapan", "Dekorasi/Panggung", "Santunan", "Transportasi", "Lain-lain"];
+
+        let dataKas = JSON.parse(localStorage.getItem('remajaMasjidMandala_v2')) || [];
+        let chartInstance = null;
+
+        document.getElementById('tanggal').valueAsDate = new Date();
+        document.getElementById('printTanggalSekarang').innerText = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+
+        // Load QRIS dari LocalStorage jika ada
+        const savedQris = localStorage.getItem('remajaMasjidMandala_qris');
+        if (savedQris) {
+            document.getElementById('qrisImg').src = savedQris;
+        }
+
+        // FUNGSI FORMAT TITIK RIBUAN PADA INPUT INPUT
+        function formatInputRupiah(input) {
+            let value = input.value.replace(/[^0-9]/g, ''); // Hapus semua karakter selain angka
+            if (value === "") {
+                input.value = "";
+                return;
+            }
+            // Format titik ribuan (contoh: 50000 -> 50.000)
+            input.value = new Intl.NumberFormat('id-ID').format(parseInt(value));
+        }
+
+        // Ambil nilai angka murni dari string berformat (contoh: "50.000" -> 50000)
+        function getRawNumber(formattedString) {
+            return parseInt(formattedString.replace(/[^0-9]/g, '')) || 0;
+        }
+
+        function toggleQrisModal() {
+            const modal = document.getElementById('qrisModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function toggleQrisSettings() {
+            const settings = document.getElementById('qrisSettings');
+            settings.classList.toggle('hidden');
+        }
+
+        function uploadQrisImage(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Img = e.target.result;
+                    document.getElementById('qrisImg').src = base64Img;
+                    localStorage.setItem('remajaMasjidMandala_qris', base64Img);
+                    alert("Gambar QRIS berhasil diperbarui dan disimpan!");
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function updateKategoriOptions() {
+            const jenis = document.getElementById('jenis').value;
+            const kategoriSelect = document.getElementById('kategori');
+            kategoriSelect.innerHTML = '';
+            
+            const list = jenis === 'masuk' ? katPemasukan : katPengeluaran;
+            list.forEach(k => {
+                const opt = document.createElement('option');
+                opt.value = k;
+                opt.textContent = k;
+                kategoriSelect.appendChild(opt);
+            });
+        }
+
+        function populateTahunOptions() {
+            const filterTahun = document.getElementById('filterTahun');
+            const currentYear = new Date().getFullYear();
+            filterTahun.innerHTML = `<option value="all">Semua Tahun</option>`;
+            for (let y = currentYear; y >= currentYear - 3; y--) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                filterTahun.appendChild(opt);
+            }
+        }
+
+        const formatRupiah = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num);
+
+        function renderApp() {
+            const tabel = document.getElementById('tabelKas');
+            tabel.innerHTML = '';
+
+            const searchVal = document.getElementById('searchInput').value.toLowerCase();
+            const bulanVal = document.getElementById('filterBulan').value;
+            const tahunVal = document.getElementById('filterTahun').value;
+
+            let filteredData = dataKas.filter(item => {
+                const [y, m] = item.tanggal.split('-');
+                const matchSearch = item.keterangan.toLowerCase().includes(searchVal) || item.kategori.toLowerCase().includes(searchVal);
+                const matchBulan = bulanVal === 'all' || m === bulanVal;
+                const matchTahun = tahunVal === 'all' || y === tahunVal;
+                return matchSearch && matchBulan && matchTahun;
+            });
+
+            filteredData.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+
+            let totalMasuk = 0;
+            let totalKeluar = 0;
+
+            if (filteredData.length === 0) {
+                tabel.innerHTML = `<tr><td colspan="6" class="text-center p-6 text-slate-400">Tidak ada data transaksi yang ditemukan.</td></tr>`;
+            } else {
+                filteredData.forEach((item) => {
+                    const isMasuk = item.jenis === 'masuk';
+                    const nominal = parseInt(item.jumlah);
+
+                    if (isMasuk) totalMasuk += nominal;
+                    else totalKeluar += nominal;
+
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-slate-50 transition';
+                    row.innerHTML = `
+                        <td class="p-3 whitespace-nowrap">${item.tanggal}</td>
+                        <td class="p-3"><span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200 font-medium">${item.kategori}</span></td>
+                        <td class="p-3 font-medium text-slate-800">${item.keterangan}</td>
+                        <td class="p-3">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${isMasuk ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                                ${isMasuk ? 'Pemasukan' : 'Pengeluaran'}
+                            </span>
+                        </td>
+                        <td class="p-3 text-right font-bold ${isMasuk ? 'text-emerald-600' : 'text-rose-600'}">
+                            ${isMasuk ? '+' : '-'} ${formatRupiah(nominal)}
+                        </td>
+                        <td class="p-3 text-center no-print">
+                            <button onclick="hapusTransaksi('${item.id}')" class="text-slate-400 hover:text-rose-600 p-1 transition" title="Hapus">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </td>
+                    `;
+                    tabel.appendChild(row);
+                });
+            }
+
+            document.getElementById('totalMasuk').innerText = formatRupiah(totalMasuk);
+            document.getElementById('totalKeluar').innerText = formatRupiah(totalKeluar);
+            document.getElementById('sisaSaldo').innerText = formatRupiah(totalMasuk - totalKeluar);
+            document.getElementById('totalTransaksiCount').innerText = `${filteredData.length} Data`;
+
+            let bulanText = document.getElementById('filterBulan').options[document.getElementById('filterBulan').selectedIndex].text;
+            document.getElementById('printPeriode').innerText = `Periode Filter: ${bulanText} ${tahunVal !== 'all' ? tahunVal : ''}`;
+
+            renderChart();
+            localStorage.setItem('remajaMasjidMandala_v2', JSON.stringify(dataKas));
+        }
+
+        document.getElementById('kasForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const rawJumlah = getRawNumber(document.getElementById('jumlahDisplay').value);
+            if (rawJumlah <= 0) {
+                alert("Nominal jumlah transaksi harus lebih dari 0!");
+                return;
+            }
+
+            const baru = {
+                id: Date.now().toString(),
+                tanggal: document.getElementById('tanggal').value,
+                jenis: document.getElementById('jenis').value,
+                kategori: document.getElementById('kategori').value,
+                jumlah: rawJumlah, // Menyimpan angka murni tanpa titik
+                keterangan: document.getElementById('keterangan').value
+            };
+
+            dataKas.push(baru);
+            renderApp();
+
+            document.getElementById('jumlahDisplay').value = '';
+            document.getElementById('keterangan').value = '';
+            document.getElementById('tanggal').valueAsDate = new Date();
+        });
+
+        function hapusTransaksi(id) {
+            if (confirm('Yakin ingin menghapus catatan transaksi ini?')) {
+                dataKas = dataKas.filter(item => item.id !== id);
+                renderApp();
+            }
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById('kasChart').getContext('2d');
+            const last6Months = [];
+            const masukData = [];
+            const keluarData = [];
+
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setMonth(d.getMonth() - i);
+                const monthKey = d.toISOString().slice(0, 7);
+                const monthLabel = d.toLocaleDateString('id-ID', { month: 'short' });
+                
+                last6Months.push(monthLabel);
+
+                let sumMasuk = 0;
+                let sumKeluar = 0;
+                dataKas.forEach(item => {
+                    if (item.tanggal.startsWith(monthKey)) {
+                        if (item.jenis === 'masuk') sumMasuk += parseInt(item.jumlah);
+                        else sumKeluar += parseInt(item.jumlah);
+                    }
+                });
+                masukData.push(sumMasuk);
+                keluarData.push(sumKeluar);
+            }
+
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: last6Months,
+                    datasets: [
+                        { label: 'Pemasukan', data: masukData, backgroundColor: '#10b981' },
+                        { label: 'Pengeluaran', data: keluarData, backgroundColor: '#f43f5e' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function exportToCSV() {
+            if (dataKas.length === 0) return alert("Belum ada data transaksi!");
+            let csv = "ID,Tanggal,Jenis,Kategori,Keterangan,Jumlah (Rp)\n";
+            dataKas.forEach(d => {
+                csv += `"${d.id}","${d.tanggal}","${d.jenis}","${d.kategori}","${d.keterangan.replace(/"/g, '""')}",${d.jumlah}\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Kas_Remaja_Masjid_Mandala_${new Date().toISOString().slice(0,10)}.csv`;
+            link.click();
+        }
+
+        function backupData() {
+            if (dataKas.length === 0) return alert("Tidak ada data untuk dibackup!");
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dataKas, null, 2));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `Backup_Kas_Mandala_${new Date().toISOString().slice(0,10)}.json`);
+            dlAnchor.click();
+        }
+
+        function restoreData(event) {
+            const fileReader = new FileReader();
+            fileReader.onload = function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    if (Array.isArray(parsedData) && confirm("Apakah Anda yakin ingin menimpa data kas saat ini?")) {
+                        dataKas = parsedData;
+                        renderApp();
+                        alert("Data kas berhasil dipulihkan!");
+                    }
+                } catch (err) {
+                    alert("Format file tidak valid!");
+                }
+            };
+            if(event.target.files[0]) fileReader.readAsText(event.target.files[0]);
+        }
+
+        updateKategoriOptions();
+        populateTahunOptions();
+        renderApp();
+    </script>
+</body>
+</html>
